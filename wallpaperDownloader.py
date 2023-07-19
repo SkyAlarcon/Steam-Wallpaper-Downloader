@@ -21,9 +21,19 @@ PATH_WEB_SCRAPER = str(f'{Path().absolute()}').replace('\\', "/")
 PATH_DOWNLOAD = f'{PATH_WEB_SCRAPER}/downloads'
 PATH_GAMES_LIST = f'{PATH_WEB_SCRAPER}/gamesLists'
 
+#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#
+"""
+Please make sure you change the links below to refer to your Steam account!
+They are, in order, Perfect Games, All Games and Recently Played.
+If you have trouble finding the links:
+- Go to your Steam profile on any browser
+- Select 'Games' on the side-menu on the right
+- Now you have a bunch of tabs and three of them will be labeled with what you want!
+"""
 URL_STEAM_PLATINUM = 'https://steamcommunity.com/id/Baby_Wolf/games?tab=perfect&fbclid=IwAR23-EperiAcuhECLmMipgDlAe4Qyj8fabhBo-TCq5mv3uCz374bF3Mecs4&sort=name'
 URL_STEAM_ALL_GAMES = 'https://steamcommunity.com/id/Baby_Wolf/games?fbclid=IwAR23-EperiAcuhECLmMipgDlAe4Qyj8fabhBo-TCq5mv3uCz374bF3Mecs4&sort=name&tab=all'
 URL_STEAM_RECENTLY_PLAYED = 'https://steamcommunity.com/id/Baby_Wolf/games?fbclid=IwAR23-EperiAcuhECLmMipgDlAe4Qyj8fabhBo-TCq5mv3uCz374bF3Mecs4&tab=recent'
+#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#
 
 URL_STEAM_PREFIX = 'https://store.steampowered.com/app/'
 URL_BACKGROUND_VIEWER = 'https://www.steamcardexchange.net/index.php?backgroundviewer'
@@ -42,15 +52,26 @@ DEFAULT_WAIT_TIME = 0.1
 DEFAULT_TIMEOUT = 10
 DEFAULT_RETRIES = 3
 LOGIN_TIMEOUT = 300
+
+#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#
+"""
+Using this controllers you may skip unnecessary parts of the code that
+you already executed.
+Here you may also select which games lists you want to access from your Steam Profile
+"""
 ACTIONS = {
-    'accessGames': False,
-    'SearchingForUrl': True
+    'accessGames': True,
+    'searchForUrl': False,
+    'downloadWallpapers': True,
+    'zipImgs': False,
+    'deleteImgs': False
 }
 GAMES_LIST_SELECTOR = {
-    '100%': False,
+    '100%': True,
     'AllGames': False,
     'RecentlyPlayed': False
 }
+#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#
 
 HEADER = ['title', 'appid', 'url']
 NOT_ALLOWED_CHARS = ['<', '>', ':', '\"', '/', '\\', '|', '?', '*']
@@ -70,7 +91,7 @@ def chromeOptionsSetup():
     options.add_argument("--log-level=3")
     return options
 
-def startWeb ():
+def startWebDriver ():
     driver = webdriver.Chrome(options = chromeOptionsSetup())
     driver.maximize_window()
     print('WebDriver started\n')
@@ -161,16 +182,24 @@ def strToList(string: str):
     jpgList = [jpgUrl for jpgUrl in lst if jpgUrl.endswith('.jpg')]
     return jpgList
 
-def prepareDirectoryName(string: str):
+def isWallpaperAlreadyDownloaded(url: str, title: str, appid: int, downloadedList: list):
+    img = prepareDownloadLinkAndFileName(url, title, appid)
+    if img['filename'] in downloadedList:
+        img['downloaded'] = True
+    return img
+
+def removeEspecialChars(string: str):
     dirName = string
     for char in NOT_ALLOWED_CHARS:
         dirName = dirName.replace(char, '')
     return dirName
 
-def prepareDownloadLinkAndFileName(string: str, appid: int):
-    filename = string.removeprefix(f'{URL_WALLPAPER_PREFIX}/{appid}/')
-    downloadLink = f'{URL_WALLPAPER_DOWNLOAD}/{appid}/{filename}'
-    return {'filename': filename, 'downloadLink': downloadLink}
+def prepareDownloadLinkAndFileName(url: str, title: str,appid: int):
+    partialFilename = url.removeprefix(f'{URL_WALLPAPER_PREFIX}/{appid}/')
+    downloadLink = f'{URL_WALLPAPER_DOWNLOAD}/{appid}/{partialFilename}'
+    titleToFile = removeEspecialChars(title)
+    filename = f'{titleToFile}_{partialFilename}'
+    return {'filename': filename, 'downloadLink': downloadLink, 'downloaded': False}
 
 #=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#
 
@@ -178,137 +207,157 @@ print('Creating directory (gamesLists)\n')
 path = Path(f'{PATH_GAMES_LIST}')
 path.mkdir(parents = True, exist_ok = True)
 
-try:
-    global driver
+def initializeWebDriver():
     print('Starting WebDriver\n')
-    driver = startWeb()
-    if GAMES_LIST_SELECTOR['100%'] or GAMES_LIST_SELECTOR['AllGames']:
+    global driver
+    driver = startWebDriver()
+
+def accessGames():
+    try:
+        if GAMES_LIST_SELECTOR['100%'] or GAMES_LIST_SELECTOR['AllGames']:
+            df = pd.DataFrame(columns = HEADER)
+            if(GAMES_LIST_SELECTOR['100%']):
+                accessSteam100edGames(driver)
+                gamesToPd = findGamesFromSteam(driver)
+                df = pd.concat([df, gamesToPd])
+            if(GAMES_LIST_SELECTOR['AllGames']):
+                accessSteamAllGames(driver)
+                gamesToPd = findGamesFromSteam(driver)
+                df = pd.concat([df, gamesToPd])
+            if(GAMES_LIST_SELECTOR['RecentlyPlayed']):
+                accessSteamRecentlyPlayed(driver)
+                gamesToPd = findGamesFromSteam(driver)
+                df = pd.concat([df, gamesToPd])
+            df.drop_duplicates(inplace = True)
+            print('Saving games information\n')
+            timestamp = moment.now().format("YYYY_MM_DD-HH_mm_ss") 
+            df.to_csv(f'{PATH_GAMES_LIST}/gamesList-{timestamp}.csv', index = False)
+    except Exception as error:
+        print('-----------------------------------------------------------')
+        print('Access and save game titles')
+        print('-----------------------------------------------------------')
+        print(error)
+        try: print(error['message'])
+        except: pass
+        exit()
+
+def createUniqueCsv():
+    print('Creating directory (downloads)\n')
+    path = Path(f'{PATH_DOWNLOAD}')
+    path.mkdir(parents = True, exist_ok = True)
+
+    print("\n#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#\n")
+    print("Please move the files you want the bot to read from 'gamesLists' to 'downloads' folder")
+    print("It may be the most recent file(s)")
+    print('When done, please press "ENTER" and select the chrome tab the bot is running on')
+    print("Please be aware that ALL CSV files will the read")
+    print("All duplicate games will be removed")
+    print("\n#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#")
+    input()
+
+    try:
+        print('Reading all CSV files on "downloads"\n')
+        filesList = os.listdir(path)
+        csvList = [file for file in filesList if file.endswith('csv')]
         df = pd.DataFrame(columns = HEADER)
-        if(GAMES_LIST_SELECTOR['100%']):
-            accessSteam100edGames(driver)
-            gamesToPd = findGamesFromSteam(driver)
-            df = pd.concat([df, gamesToPd])
-        if(GAMES_LIST_SELECTOR['AllGames']):
-            accessSteamAllGames(driver)
-            gamesToPd = findGamesFromSteam(driver)
-            df = pd.concat([df, gamesToPd])
-        if(GAMES_LIST_SELECTOR['RecentlyPlayed']):
-            accessSteamRecentlyPlayed(driver)
-            gamesToPd = findGamesFromSteam(driver)
-            df = pd.concat([df, gamesToPd])
-        df.drop_duplicates(inplace = True)
-        print('Saving games information\n')
-        timestamp = moment.now().format("YYYY_MM_DD-HH_mm_ss") 
-        df.to_csv(f'{PATH_GAMES_LIST}/gamesList-{timestamp}.csv', index = False)
-except Exception as error:
-    print('-----------------------------------------------------------')
-    print('Access and save game titles')
-    print('-----------------------------------------------------------')
-    print(error)
-    try: print(error['message'])
-    except: pass
-    exit()
+        for csvFile in csvList:
+            dfToConcat = pd.read_csv(f'{path}/{csvFile}')
+            df = pd.concat([df, dfToConcat])
+        df.sort_values(['title', 'url'], inplace = True)
+        df.drop_duplicates(inplace = True, subset = 'appid')
+        df.reset_index(inplace = True, drop = True)
+        df.to_csv(f'{PATH_DOWNLOAD}/_gamesList.csv', index = False)
+    except Exception as error: 
+        print('-----------------------------------------------------------')
+        print('Read gamesCSV')
+        print('-----------------------------------------------------------')
+        print(error)
+        try: print(error['message'])
+        except: pass
+        exit()
 
-print('Creating directory (downloads)\n')
-path = Path(f'{PATH_DOWNLOAD}')
-path.mkdir(parents = True, exist_ok = True)
+def searchForUrl():
+    try:
+        print('Accessing background viewer\n')
+        driver.get(URL_BACKGROUND_VIEWER)
+        wait(1)
+        inputBox = driver.find_element(By.ID, ID_INPUT_BACKGROUND_VIEWER)
+        df = pd.read_csv(f'{PATH_DOWNLOAD}/_gamesList.csv')
+        gamesList = df.to_dict('records')
+        inputBoxOutcome = {'lastSearch': ''}
+        wallpaperList = ''
+        wallpaperListPreviousOutcome = ''
+        for game in gamesList:
+            inputBox.clear()
+            gameHasUrl = haveUrl(game)
+            if gameHasUrl: continue
+            print(f"#--- {game['title']} ---#")
+            sendKeysWithInterval(game['title'], inputBox)
+            wait(randomTime(6, 7)/10)
+            waitSearchList(driver)
+            wait(randomTime(1, 2)/10)
+            inputBoxOutcome = findGameInList(driver, game['appid'], inputBoxOutcome['lastSearch'])
+            if not inputBoxOutcome['hasWallpaper']: 
+                print('No wallpapers found...\n')
+                continue
+            waitWallpaperListLoad(driver)
+            divList = driver.find_element(By.ID, ID_DIV_BG_CONTAINER)
+            while wallpaperListPreviousOutcome == wallpaperList:
+                wait(0.2)
+                wallpaperList = divList.find_elements(By.TAG_NAME, 'a')
+            print(f'Found {len(wallpaperList)} wallpapers!\n')
+            wallpaperListPreviousOutcome = wallpaperList
+            urlList = [wallpaperElement.get_attribute('href') for wallpaperElement in wallpaperList]
+            df.loc[df['title'] == game['title'], ['url']] = str(urlList)
+        print('Saving all urls\n')
+        df.to_csv(f'{PATH_DOWNLOAD}/_gamesList.csv', index = False)
+    except Exception as error:
+        print('-----------------------------------------------------------')
+        print('Get Wallpaper links')
+        print('-----------------------------------------------------------')
+        print(error)
+        try: print(error['message'])
+        except: pass
+        exit()
 
-print("\n#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#\n")
-print("Please move the files you want the bot to read from 'gamesLists' to 'downloads' folder")
-print("It may be the most recent file(s)")
-print('When done, please press "ENTER" and select the chrome tab the bot is running on')
-print("Please be aware that ALL CSV files will the read")
-print("All duplicate games will be removed")
-print("\n#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#")
-input()
-
-try:
-    print('Reading all CSV files on "downloads"\n')
-    filesList = os.listdir(path)
-    csvList = [file for file in filesList if file.endswith('csv')]
-    df = pd.DataFrame(columns = HEADER)
-    for csvFile in csvList:
-        dfToConcat = pd.read_csv(f'{path}/{csvFile}')
-        df = pd.concat([df, dfToConcat])
-    df.sort_values(['title', 'url'], inplace = True)
-    df.drop_duplicates(inplace = True, subset = 'appid')
-    df.reset_index(inplace = True, drop = True)
-    df.to_csv(f'{PATH_DOWNLOAD}/_gamesList.csv', index = False)
-except Exception as error: 
-    print('-----------------------------------------------------------')
-    print('Read gamesCSV')
-    print('-----------------------------------------------------------')
-    print(error)
-    try: print(error['message'])
-    except: pass
-    exit()
-
-try:
-    print('Accessing background viewer\n')
-    driver.get(URL_BACKGROUND_VIEWER)
-    wait(1)
-    inputBox = driver.find_element(By.ID, ID_INPUT_BACKGROUND_VIEWER)
-    df = pd.read_csv(f'{PATH_DOWNLOAD}/_gamesList.csv')
-    gamesList = df.to_dict('records')
-    inputBoxOutcome = {'lastSearch': ''}
-    wallpaperList = ''
-    wallpaperListPreviousOutcome = ''
-    for game in gamesList:
-        inputBox.clear()
-        gameHasUrl = haveUrl(game)
-        if gameHasUrl: continue
-        print(f"#--- {game['title']} ---#")
-        sendKeysWithInterval(game['title'], inputBox)
-        wait(randomTime(6, 7)/10)
-        waitSearchList(driver)
-        wait(randomTime(1, 2)/10)
-        inputBoxOutcome = findGameInList(driver, game['appid'], inputBoxOutcome['lastSearch'])
-        if not inputBoxOutcome['hasWallpaper']: 
-            print('No wallpapers found...\n')
-            continue
-        waitWallpaperListLoad(driver)
-        divList = driver.find_element(By.ID, ID_DIV_BG_CONTAINER)
-        while wallpaperListPreviousOutcome == wallpaperList:
-            wait(0.2)
-            wallpaperList = divList.find_elements(By.TAG_NAME, 'a')
-        print(f'Found {len(wallpaperList)} wallpapers!\n')
-        wallpaperListPreviousOutcome = wallpaperList
-        urlList = [wallpaperElement.get_attribute('href') for wallpaperElement in wallpaperList]
-        df.loc[df['title'] == game['title'], ['url']] = str(urlList)
-    print('Saving all urls\n')
-    df.to_csv(f'{PATH_DOWNLOAD}/_gamesList.csv', index = False)
-except Exception as error:
-    print('-----------------------------------------------------------')
-    print('Get Wallpaper links')
-    print('-----------------------------------------------------------')
-    print(error)
-    try: print(error['message'])
-    except: pass
-    exit()
-
-try:
-    print('Downloading wallpapers\n')
-    df = pd.read_csv(f'{PATH_DOWNLOAD}/_gamesList.csv')
-    gamesList = df.to_dict('records')
-    for game in gamesList:
-        haveWallpapers = haveUrl(game)
-        if not haveWallpapers: continue
-        print(f'#--- {game["title"]} ---#')
-        print(f'Creating directory')
-        dirName = prepareDirectoryName(game['title'])
-        path = Path(f'{PATH_DOWNLOAD}/{dirName}')
+def downloadWallpapers():
+    try:
+        print('Downloading wallpapers\n')
+        df = pd.read_csv(f'{PATH_DOWNLOAD}/_gamesList.csv')
+        print('Creating directory (downloads/wallpapers)')
+        path = Path(f'{PATH_DOWNLOAD}/wallpapers')
         path.mkdir(parents = True, exist_ok = True)
-        urlList = strToList(game['url'])
-        for wallpaperUrl in urlList:
-            img = prepareDownloadLinkAndFileName(wallpaperUrl, game['appid'])
-            imgReq.urlretrieve(img['downloadLink'], f'{path}/{img["filename"]}')
-        print(f'Downloaded {len(urlList)} wallpapers\n')
-    print('Completed all downloads')
-except Exception as error:
-    print('-----------------------------------------------------------')
-    print('Download Wallpaper')
-    print('-----------------------------------------------------------')
-    print(error)
-    try: print(error['message'])
-    except: pass
-    exit()
+        downloadedList = os.listdir(path)
+        gamesList = df.to_dict('records')
+        for game in gamesList:
+            haveWallpapers = haveUrl(game)
+            if not haveWallpapers: continue
+            print(f'#--- {game["title"]} ---#')
+            urlList = strToList(game['url'])
+            for wallpaperUrl in urlList:
+                img = isWallpaperAlreadyDownloaded(wallpaperUrl, game['title'], game['appid'], downloadedList)
+                if img['downloaded']: continue
+                imgReq.urlretrieve(img['downloadLink'], f'{path}/{img["filename"]}')
+            print(f'Downloaded {len(urlList)} wallpapers\n')
+        print('Completed all downloads')
+    except Exception as error:
+        print('-----------------------------------------------------------')
+        print('Download Wallpaper')
+        print('-----------------------------------------------------------')
+        print(error)
+        try: print(error['message'])
+        except: pass
+        exit()
+
+def zipImgs():
+    pass
+
+def main():
+    if ACTIONS['accessGames'] or ACTIONS['searchForUrl']: initializeWebDriver()
+    if ACTIONS['accessGames']: accessGames()
+    createUniqueCsv()
+    if ACTIONS['searchForUrl']: searchForUrl()
+    if ACTIONS['downloadWallpapers']: downloadWallpapers()
+    if ACTIONS['zipImgs']: zipImgs()
+
+main()
