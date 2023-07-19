@@ -1,1 +1,1 @@
-py ./backgroundDownloader
+py ./wallpaperDownloader.py

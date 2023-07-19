@@ -1,3 +1,5 @@
-/webdriver/chromeDriver-v114.exe
-/downloaded
-login.txt
+webdriver/chromeDriver-v114.exe
+downloads
+gamesLists
+csvreader.py
+gamesList.csv
