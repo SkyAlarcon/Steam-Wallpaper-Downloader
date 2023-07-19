@@ -17,9 +17,9 @@ Pretty straight forward.
 This code was developed in **Python**. So you may need to install Python3 to use it.
 
 You will need to install some dependencies too:
-- pandas
-- arrow
-- selenium
+- **pandas**
+- **arrow**
+- **selenium**
 
 To set up everything properly, open **wallpaperDownloader.py** and insert your links on the variables:
 - **URL_STEAM_PLATINUM** | Perfect Games
@@ -28,6 +28,6 @@ To set up everything properly, open **wallpaperDownloader.py** and insert your l
 
 After that look for the variable **ACTIONS** and make sure that, at least for the first time you run the downloader **accessGames** is set to `True`. To do everything at once, be sure to set **searchForUrl** and **downloadWallpapers** to `True` also.
 
-Right below **ACTIONS**, on **GAMES_LIST_SELECTOR**, set, AT LEAST, one of the fileds to `True`, so the downloader knows where to retrieve the information.
+Right below **ACTIONS**, on **GAMES_LIST_SELECTOR**, set, AT LEAST, one of the fields to `True`, so the downloader knows where to retrieve the information.
 
 I'm working on zipping all downloaded wallpapers to make the file lighter.
