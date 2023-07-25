@@ -31,3 +31,12 @@ After that look for the variable **ACTIONS** and make sure that, at least for th
 Right below **ACTIONS**, on **GAMES_LIST_SELECTOR**, set, AT LEAST, one of the fields to `True`, so the downloader knows where to retrieve the information.
 
 I'm working on zipping all downloaded wallpapers to make the file lighter.
+
+# What happens if it fails
+Let the program take it's sweet time. For 40 something games, it took about 5 minutes.
+
+The most time consuming operation is gathering all links, because it needs to search for the game and grab it from a list that needs time to load.
+
+The parts that are 'most delicate' are when it needs to gather the games from Steam and the wallpaper links afterwards, but they are independent (I may work on a way to maky it save every step of the way, but it seems quite slow doing it).
+
+When downloading, even if it crashes midway, it won't try to download it again (if the wallpapers are on the same file that they were downloaded).

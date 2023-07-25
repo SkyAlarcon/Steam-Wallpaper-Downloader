@@ -30,7 +30,7 @@ If you have trouble finding the links:
 - Select 'Games' on the side-menu on the right
 - Now you have a bunch of tabs and three of them will be labeled with what you want!
 """
-URL_STEAM_PLATINUM = 'https://steamcommunity.com/id/Baby_Wolf/games?tab=perfect&fbclid=IwAR23-EperiAcuhECLmMipgDlAe4Qyj8fabhBo-TCq5mv3uCz374bF3Mecs4&sort=name'
+URL_STEAM_PERFECT_GAMES = 'https://steamcommunity.com/id/Baby_Wolf/games?tab=perfect&fbclid=IwAR23-EperiAcuhECLmMipgDlAe4Qyj8fabhBo-TCq5mv3uCz374bF3Mecs4&sort=name'
 URL_STEAM_ALL_GAMES = 'https://steamcommunity.com/id/Baby_Wolf/games?fbclid=IwAR23-EperiAcuhECLmMipgDlAe4Qyj8fabhBo-TCq5mv3uCz374bF3Mecs4&sort=name&tab=all'
 URL_STEAM_RECENTLY_PLAYED = 'https://steamcommunity.com/id/Baby_Wolf/games?fbclid=IwAR23-EperiAcuhECLmMipgDlAe4Qyj8fabhBo-TCq5mv3uCz374bF3Mecs4&tab=recent'
 #=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#=-=-=-=-=-=-=-=-=-=#
@@ -107,7 +107,7 @@ def waitSteamLogin (driver: WebDriver):
 
 def accessSteam100edGames (driver: WebDriver):
     print(f"Accessing 100%ed games\n")
-    driver.get(URL_STEAM_PLATINUM)
+    driver.get(URL_STEAM_PERFECT_GAMES)
     waitSteamLogin(driver)
     wait(1)
 
